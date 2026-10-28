@@ -189,24 +189,44 @@ class SistemaGestionAcademica:
 
         # 1. Cédula
         while True:
-            cedula_prof = input("Cédula/ID del Profesor (Ej. V-123456): ").strip().upper()
-            if len(cedula_prof) > 2 and cedula_prof[:2] in ("V-", "E-") and cedula_prof[2:].isdigit():
+            cedula_prof = (
+                input("Cédula/ID del Profesor (Ej. V-123456): ").strip().upper()
+            )
+            if (
+                len(cedula_prof) > 2
+                and cedula_prof[:2] in ("V-", "E-")
+                and cedula_prof[2:].isdigit()
+            ):
                 if cedula_prof in self.profesores:
                     print("❌ Error: Ya existe un profesor registrado con esa cédula.")
                     continue
-                confirmacion = input(f"Has ingresado la cédula: {cedula_prof}. ¿Es correcta? (s/n): ").strip().lower()
+                confirmacion = (
+                    input(
+                        f"Has ingresado la cédula: {cedula_prof}. ¿Es correcta? (s/n): "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if confirmacion in ["s", "si", "sí"]:
                     break
                 print("🔄 De acuerdo, vamos a ingresarla de nuevo.\n")
                 continue
-            print("❌ Error: Formato inválido. Debe comenzar con V- o E- seguido de números (Ej: V-123456).")
+            print(
+                "❌ Error: Formato inválido. Debe comenzar con V- o E- seguido de números (Ej: V-123456)."
+            )
 
         # 2. Nombre
         while True:
             nombre_prof = input("Nombre Completo del Profesor: ").strip()
             if nombre_prof and nombre_prof.replace(" ", "").isalpha():
                 nombre_formateado = nombre_prof.title()
-                confirmacion = input(f"Has ingresado el nombre: {nombre_formateado}. ¿Es correcto? (s/n): ").strip().lower()
+                confirmacion = (
+                    input(
+                        f"Has ingresado el nombre: {nombre_formateado}. ¿Es correcto? (s/n): "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if confirmacion in ["s", "si", "sí"]:
                     nombre_prof = nombre_formateado
                     break
@@ -218,19 +238,33 @@ class SistemaGestionAcademica:
         while True:
             correo_prof = input("Correo Electrónico del Profesor: ").strip()
             if "@" in correo_prof and "." in correo_prof.split("@")[-1]:
-                confirmacion = input(f"Has ingresado el correo: {correo_prof}. ¿Es correcto? (s/n): ").strip().lower()
+                confirmacion = (
+                    input(
+                        f"Has ingresado el correo: {correo_prof}. ¿Es correcto? (s/n): "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if confirmacion in ["s", "si", "sí"]:
                     break
                 print("🔄 De acuerdo, vamos a ingresar el correo de nuevo.\n")
                 continue
-            print("❌ Formato inválido. Asegúrate de incluir '@' y un dominio válido.\n")
+            print(
+                "❌ Formato inválido. Asegúrate de incluir '@' y un dominio válido.\n"
+            )
 
         # 4. Especialidad
         while True:
             especialidad = input("Especialidad del Profesor: ").strip()
             if especialidad and especialidad.replace(" ", "").isalpha():
                 especialidad_formateada = especialidad.title()
-                confirmacion = input(f"Has ingresado la especialidad: {especialidad_formateada}. ¿Es correcta? (s/n): ").strip().lower()
+                confirmacion = (
+                    input(
+                        f"Has ingresado la especialidad: {especialidad_formateada}. ¿Es correcta? (s/n): "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if confirmacion in ["s", "si", "sí"]:
                     especialidad = especialidad_formateada
                     break
@@ -243,7 +277,13 @@ class SistemaGestionAcademica:
             materia = input("Materia que imparte: ").strip()
             if materia:
                 materia_formateada = materia.title()
-                confirmacion = input(f"Has ingresado la materia: {materia_formateada}. ¿Es correcta? (s/n): ").strip().lower()
+                confirmacion = (
+                    input(
+                        f"Has ingresado la materia: {materia_formateada}. ¿Es correcta? (s/n): "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if confirmacion in ["s", "si", "sí"]:
                     materia = materia_formateada
                     break
@@ -251,51 +291,100 @@ class SistemaGestionAcademica:
                 continue
             print("❌ Error: La materia no puede estar vacía.")
 
-        profesor = Profesor(cedula_prof, nombre_prof, correo_prof, especialidad, materia)
+        profesor = Profesor(
+            cedula_prof, nombre_prof, correo_prof, especialidad, materia
+        )
         self.profesores[cedula_prof] = profesor
 
         with open("profesores.txt", "a", encoding="utf-8") as f:
-            f.write(f"{cedula_prof},{nombre_prof},{correo_prof},{especialidad},{materia}\n")
+            f.write(
+                f"{cedula_prof},{nombre_prof},{correo_prof},{especialidad},{materia}\n"
+            )
 
-        print(f"✅ Profesor '{nombre_prof}' registrado exitosamente en memoria y en profesores.txt")
+        print(
+            f"✅ Profesor '{nombre_prof}' registrado exitosamente en memoria y en profesores.txt"
+        )
 
+    # --- 3. REGISTRAR NOTAS A UN ALUMNO ---
     def registrar_notas_alumno(self):
-        print("\n--- REGISTRAR NOTA A UN ALUMNO ---")
-        cedula = input("Ingrese la Cédula del alumno: ").strip()
+        print("\n--- REGISTRO DE NOTAS ---")
 
-        # Buscar en memoria
-        alumno = self.alumnos.get(cedula)
-        if not alumno:
-            print("❌ Alumno no encontrado.")
+        while True:
+            cedula_buscar = (
+                input("Cédula/ID del Alumno a calificar (Ej. V-123456): ")
+                .strip()
+                .upper()
+            )
+            if (
+                len(cedula_buscar) > 2
+                and cedula_buscar[:2] in ("V-", "E-")
+                and cedula_buscar[2:].isdigit()
+            ):
+                break
+            print(
+                "❌ Error: Formato inválido. Debe comenzar con V- o E- seguido de números."
+            )
+
+        alumno_info = self.alumnos.get(cedula_buscar)
+        if alumno_info is None:
+            print(
+                f"❌ No se encontró ningún alumno registrado con la cédula {cedula_buscar}."
+            )
             return
 
-        if len(alumno.notas) >= 3:
-            print("⚠️ El alumno ya tiene el máximo de 3 notas registradas.")
-            return
+        tipo_prog = alumno_info.programa.nombre
+        print(f"✅ Alumno encontrado: {alumno_info.nombre} | Programa: {tipo_prog}")
 
-        try:
-            nota = float(input(f"Ingrese la nota #{len(alumno.notas) + 1} (0-20): "))
-            if 0 <= nota <= 20:
-                alumno.notas.append(nota)
-                # Apilar acción para opción Deshacer (LIFO)
-                self.pila_notas.append({"cedula": cedula, "nota": nota})
-                print(f"✅ Nota {nota} asignada a {alumno.nombre}.")
-            else:
-                print("❌ La nota debe estar entre 0 y 20.")
-        except ValueError:
-            print("❌ Entrada inválida. Debe ingresar un número.")
+        calificaciones = []
+        print(f"\nIngrese las 3 calificaciones (Escala de 0 a 20) para el {tipo_prog}:")
+        for i in range(1, 4):
+            while True:
+                try:
+                    nota = float(input(f"Calificación {i} (0-20): ").strip())
+                    if 0 <= nota <= 20:
+                        calificaciones.append(nota)
+                        break
+                    print("❌ Error: La nota debe estar entre 0 y 20.")
+                except ValueError:
+                    print("❌ Error: Debe ingresar un valor numérico válido.")
+
+        promedio = sum(calificaciones) / len(calificaciones)
+        if tipo_prog == "Diplomado":
+            aprobado = promedio >= 14.0
+            criterio_txt = f"Promedio requerido: >= 14.0 (Tu promedio: {promedio:.2f})"
+        elif tipo_prog == "Bootcamp":
+            aprobado = all(nota >= 14.0 for nota in calificaciones)
+            criterio_txt = (
+                "Requisito Bootcamp: Ninguna nota individual puede ser menor a 14.0"
+            )
+        else:
+            aprobado = promedio >= 10.0
+            criterio_txt = f"Promedio requerido: >= 10.0 (Tu promedio: {promedio:.2f})"
+
+        estado = "APROBADO" if aprobado else "REPROBADO"
+        alumno_info.notas = calificaciones
+        alumno_info.promedio = promedio
+        alumno_info.estado = estado
+        self.pila_notas.extend(
+            {"cedula": cedula_buscar, "nota": nota} for nota in calificaciones
+        )
+
+        print("\n" + "=" * 45)
+        print(f"📊 RESULTADOS FINALES PARA: {alumno_info.nombre}")
+        print(f"Notas registradas: {calificaciones}")
+        print(f"Promedio obtenido: {promedio:.2f}")
+        print(f"Criterio aplicado: {criterio_txt}")
+        print(f"Estado Final: {estado}")
+        print("=" * 45)
 
     def deshacer_ultima_nota(self):
-        print("\n--- DESHACER ÚLTIMO REGISTRO DE NOTA (Ctrl + Z / LIFO) ---")
         if not self.pila_notas:
-            print("⚠️ No hay notas registradas en la pila para deshacer.")
+            print("⚠️ No hay notas para deshacer.")
             return
 
-        # Extraer último elemento apilado (LIFO)
         ultimo_registro = self.pila_notas.pop()
         cedula = ultimo_registro["cedula"]
         nota_removida = ultimo_registro["nota"]
-
         alumno = self.alumnos.get(cedula)
         if alumno and nota_removida in alumno.notas:
             alumno.notas.remove(nota_removida)
@@ -323,6 +412,7 @@ class SistemaGestionAcademica:
             print(
                 f"- {al.nombre} | ID: {al.cedula} | Programa: {al.programa.nombre} | Notas: {al.notas}"
             )
+
 
 # ==========================================
 # BUCLE PRINCIPAL DE CONSOLA
