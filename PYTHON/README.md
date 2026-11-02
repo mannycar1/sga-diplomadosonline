@@ -6,7 +6,7 @@ Se mantiene la misma estructura orientada a objetos (UML), implementando las 7 o
 persistencia automática en archivos de texto plano (.txt), la Pila LIFO (para la función de deshacer nota / Ctrl + Z) y 
 la Cola FIFO (para el procesamiento e impresión de certificados
 
-Pendiente de implementar:
+Se estableció las siguientes implementaciones:
 - Clases: Persona, Alumno, Profesor, ProgramaAcademico (y subclases Curso, Diplomado, Bootcamp)
 - Menú por consola en bucle (opciones 1-7)
 - Persistencia en alumnos.txt / profesores.txt / certificados_pendientes.txt
