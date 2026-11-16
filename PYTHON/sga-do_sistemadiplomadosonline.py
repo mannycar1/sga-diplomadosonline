@@ -47,38 +47,7 @@ def leer_input_con_escape(mensaje):
                         sys.stdout.flush()
                     except UnicodeDecodeError:
                         pass
-    else:
-        import termios
-        import tty
-
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            while True:
-                ch = sys.stdin.read(1)
-                if ch == "\x1b":  # Código de la tecla ESC
-                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-                    print(
-                        "\r\n\n🔙 [ESC detectado] Cancelando y regresando al menú principal...\r"
-                    )
-                    return None
-                elif ch in ("\r", "\n"):
-                    sys.stdout.write("\r\n")
-                    sys.stdout.flush()
-                    return "".join(chars)
-                elif ch == "\x7f":  # Backspace
-                    if chars:
-                        chars.pop()
-                        sys.stdout.write("\b \b")
-                        sys.stdout.flush()
-                else:
-                    chars.append(ch)
-                    sys.stdout.write(ch)
-                    sys.stdout.flush()
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-
+    
 
 # ==========================================
 # CLASES DE PROGRAMAS ACADÉMICOS
