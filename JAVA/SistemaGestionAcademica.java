@@ -150,6 +150,7 @@ public class SistemaGestionAcademica {
     private Scanner scanner;
 
     private static final Pattern PATRON_CORREO = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    private static final String REGEX_ACADEMICO = "[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ+#.,/\\-()\\s]+";
 
     public SistemaGestionAcademica(Scanner scanner) {
         this.alumnos = new HashMap<>();
@@ -574,8 +575,8 @@ public class SistemaGestionAcademica {
 
                 String especialidad;
                 while (true) {
-                    especialidad = pedir("Especialidad del Profesor: ");
-                    if (!especialidad.isEmpty() && especialidad.matches("[a-zA-ZáéíóúÁÉÍÓÚñÑ'\\-.\\s]+")) {
+                    especialidad = pedir("Especialidad del Profesor (ej: C++, C#, Ingeniería): ");
+                    if (!especialidad.isEmpty() && especialidad.matches(REGEX_ACADEMICO)) {
                         String espFormateada = formatearNombre(especialidad);
                         String confirmacion = pedir("Has ingresado la especialidad: " + espFormateada + ". ¿Es correcta? (s/n): ").toLowerCase();
                         if (confirmacion.equals("s") || confirmacion.equals("si") || confirmacion.equals("sí")) {
@@ -585,13 +586,13 @@ public class SistemaGestionAcademica {
                         System.out.println("🔄 De acuerdo, vamos a ingresar la especialidad de nuevo.\n");
                         continue;
                     }
-                    System.out.println("❌ Error: La especialidad debe contener solo letras, espacios, apóstrofos o guiones.");
+                    System.out.println("❌ Error: La especialidad contiene caracteres no permitidos o está vacía.");
                 }
 
                 String materia;
                 while (true) {
-                    materia = pedir("Materia que imparte (puede incluir comas, ej: Física, Matemáticas): ");
-                    if (!materia.isEmpty()) {
+                    materia = pedir("Materia que imparte (ej: C++, Física, Matemáticas): ");
+                    if (!materia.isEmpty() && materia.matches(REGEX_ACADEMICO)) {
                         String matFormateada = formatearNombre(materia);
                         String confirmacion = pedir("Has ingresado la materia: " + matFormateada + ". ¿Es correcta? (s/n): ").toLowerCase();
                         if (confirmacion.equals("s") || confirmacion.equals("si") || confirmacion.equals("sí")) {
@@ -601,7 +602,7 @@ public class SistemaGestionAcademica {
                         System.out.println("🔄 De acuerdo, vamos a ingresar la materia de nuevo.\n");
                         continue;
                     }
-                    System.out.println("❌ Error: La materia no puede estar vacía.");
+                    System.out.println("❌ Error: La materia contiene caracteres no permitidos o está vacía.");
                 }
 
                 try (BufferedWriter bw = new BufferedWriter(new FileWriter("profesores.txt", true))) {
