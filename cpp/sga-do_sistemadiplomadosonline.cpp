@@ -7,7 +7,6 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
-#include <memory>
 #include <queue>
 #include <sstream>
 #include <stack>
@@ -90,7 +89,12 @@ static bool esConfirmacionSi(const std::string& resp) {
     return (r == "s" || r == "si" || r == "sí");
 }
 
+// Soporta tecla física ESC, palabra ESC/Esc/esc y secuencias iniciadas con '\x1b'
 static bool leerInputConEscape(const std::string& mensaje, std::string& salida) {
+    if (std::cin.fail()) {
+        std::cin.clear();
+    }
+
     std::cout << mensaje << std::flush;
 
 #ifdef _WIN32
@@ -98,11 +102,15 @@ static bool leerInputConEscape(const std::string& mensaje, std::string& salida) 
     while (true) {
         if (_kbhit()) {
             int ch = _getch();
-            if (ch == 27) { // Código ASCII de ESC (\x1b)
+            if (ch == 27) { // Tecla física ESC
                 std::cout << "\n\n🔙 [ESC detectado] Cancelando y regresando al menú principal...\n";
                 return false;
             } else if (ch == '\r' || ch == '\n') {
                 std::cout << "\n";
+                if (toUpper(trim(chars)) == "ESC" || (!chars.empty() && chars[0] == '\x1b')) {
+                    std::cout << "🔙 [ESC detectado] Cancelando y regresando al menú principal...\n";
+                    return false;
+                }
                 salida = chars;
                 return true;
             } else if (ch == 8) { // Backspace
@@ -110,6 +118,9 @@ static bool leerInputConEscape(const std::string& mensaje, std::string& salida) 
                     chars.pop_back();
                     std::cout << "\b \b" << std::flush;
                 }
+            } else if (ch == 0 || ch == 224) {
+                // Consume códigos extendidos (flechas, F1-F12, etc.)
+                (void)_getch();
             } else if (ch >= 32 && ch <= 126) {
                 char c = static_cast<char>(ch);
                 chars.push_back(c);
@@ -119,9 +130,11 @@ static bool leerInputConEscape(const std::string& mensaje, std::string& salida) 
     }
 #else
     if (!std::getline(std::cin, salida)) {
+        std::cin.clear();
         return false;
     }
-    if (toUpper(trim(salida)) == "ESC") {
+    std::string limpia = trim(salida);
+    if (toUpper(limpia) == "ESC" || (!salida.empty() && salida[0] == '\x1b')) {
         std::cout << "\n🔙 [ESC detectado] Cancelando y regresando al menú principal...\n";
         return false;
     }
@@ -157,7 +170,6 @@ public:
     std::string getNombre() const { return nombre; }
     virtual bool estaAprobado(double promedio, const std::vector<int>& notas) const = 0;
     virtual std::string getEstatusCertificado() const = 0;
-    virtual std::unique_ptr<ProgramaAcademico> clonar() const = 0;
 };
 
 class Curso : public ProgramaAcademico {
@@ -171,10 +183,6 @@ public:
     std::string getEstatusCertificado() const override {
         return "APROBADO";
     }
-
-    std::unique_ptr<ProgramaAcademico> clonar() const override {
-        return std::make_unique<Curso>(*this);
-    }
 };
 
 class Diplomado : public ProgramaAcademico {
@@ -187,10 +195,6 @@ public:
 
     std::string getEstatusCertificado() const override {
         return "APROBADO";
-    }
-
-    std::unique_ptr<ProgramaAcademico> clonar() const override {
-        return std::make_unique<Diplomado>(*this);
     }
 };
 
@@ -210,14 +214,10 @@ public:
     std::string getEstatusCertificado() const override {
         return "APROBADO (Cumple regla de ninguna nota < 14)";
     }
-
-    std::unique_ptr<ProgramaAcademico> clonar() const override {
-        return std::make_unique<Bootcamp>(*this);
-    }
 };
 
 // ==========================================
-// CLASES DE PERSONAS (HERENCIA)
+// CLASES DE PERSONAS (HERENCIA + GESTIÓN MANUAL)
 // ==========================================
 class Persona {
 protected:
@@ -238,7 +238,7 @@ public:
 
 class Alumno : public Persona {
 private:
-    std::unique_ptr<ProgramaAcademico> programa;
+    ProgramaAcademico* programa; // Puntero dinámico gestionado con new/delete
     std::vector<int> notas;
     double promedio;
     std::string estado;
@@ -247,13 +247,21 @@ public:
     Alumno(const std::string& cedula,
            const std::string& nombre,
            const std::string& correo,
-           std::unique_ptr<ProgramaAcademico> prog)
+           ProgramaAcademico* prog)
         : Persona(cedula, nombre, correo),
-          programa(std::move(prog)),
+          programa(prog),
           promedio(0.0),
           estado("PENDIENTE") {}
 
-    const ProgramaAcademico* getPrograma() const { return programa.get(); }
+    ~Alumno() override {
+        delete programa;
+        programa = nullptr;
+    }
+
+    Alumno(const Alumno&) = delete;
+    Alumno& operator=(const Alumno&) = delete;
+
+    const ProgramaAcademico* getPrograma() const { return programa; }
     const std::vector<int>& getNotas() const { return notas; }
     std::vector<int>& getNotasModificables() { return notas; }
     void setNotas(const std::vector<int>& nuevasNotas) { notas = nuevasNotas; }
@@ -299,6 +307,11 @@ public:
           especialidad(especialidad),
           materia(materia) {}
 
+    ~Profesor() override = default;
+
+    Profesor(const Profesor&) = delete;
+    Profesor& operator=(const Profesor&) = delete;
+
     std::string getEspecialidad() const { return especialidad; }
     std::string getMateria() const { return materia; }
 };
@@ -313,23 +326,38 @@ struct AccionNota {
 // ==========================================
 class SistemaGestionAcademica {
 private:
-    std::unordered_map<std::string, std::unique_ptr<Alumno>> alumnos;
-    std::unordered_map<std::string, std::unique_ptr<Profesor>> profesores;
+    std::unordered_map<std::string, Alumno*> alumnos;
+    std::unordered_map<std::string, Profesor*> profesores;
     std::stack<AccionNota> pilaNotas;
 
-    static std::unique_ptr<ProgramaAcademico> crearProgramaPorNombre(const std::string& tipoProg) {
+    static ProgramaAcademico* crearProgramaPorNombre(const std::string& tipoProg) {
         if (tipoProg == "Diplomado") {
-            return std::make_unique<Diplomado>();
+            return new Diplomado();
         } else if (tipoProg == "Bootcamp") {
-            return std::make_unique<Bootcamp>();
+            return new Bootcamp();
         }
-        return std::make_unique<Curso>();
+        return new Curso();
     }
 
 public:
     SistemaGestionAcademica() {
         cargarDatosAlmacenados();
     }
+
+    ~SistemaGestionAcademica() {
+        for (auto& par : alumnos) {
+            delete par.second;
+        }
+        alumnos.clear();
+
+        for (auto& par : profesores) {
+            delete par.second;
+        }
+        profesores.clear();
+    }
+
+    SistemaGestionAcademica(const SistemaGestionAcademica&) = delete;
+    SistemaGestionAcademica& operator=(const SistemaGestionAcademica&) = delete;
 
     std::string pedir(const std::string& mensaje) const {
         std::string res;
@@ -347,7 +375,7 @@ public:
         }
 
         for (const auto& par : alumnos) {
-            const Alumno* al = par.second.get();
+            const Alumno* al = par.second;
             std::string tipoProg = (al->getPrograma() != nullptr) ? al->getPrograma()->getNombre() : "Curso";
             std::ostringstream notasOss;
             const auto& listaNotas = al->getNotas();
@@ -367,7 +395,6 @@ public:
     }
 
     void cargarDatosAlmacenados() {
-        // 1. Cargar Alumnos y generar copia de seguridad automática
         if (fs::exists("alumnos.txt")) {
             try {
                 fs::create_directories("backups");
@@ -403,11 +430,16 @@ public:
                             }
                         }
 
-                        auto objProg = crearProgramaPorNombre(tipoProg);
-                        auto alumnoObj = std::make_unique<Alumno>(cedula, nombre, correo, std::move(objProg));
+                        auto existente = alumnos.find(cedula);
+                        if (existente != alumnos.end()) {
+                            delete existente->second;
+                        }
+
+                        ProgramaAcademico* objProg = crearProgramaPorNombre(tipoProg);
+                        Alumno* alumnoObj = new Alumno(cedula, nombre, correo, objProg);
                         alumnoObj->setNotas(notas);
                         alumnoObj->calcularRendimiento();
-                        alumnos[cedula] = std::move(alumnoObj);
+                        alumnos[cedula] = alumnoObj;
                     }
                 }
                 std::cout << "📁 Alumnos cargados correctamente desde alumnos.txt.\n";
@@ -416,7 +448,6 @@ public:
             }
         }
 
-        // 2. Cargar Profesores
         if (fs::exists("profesores.txt")) {
             try {
                 std::ifstream archivo("profesores.txt");
@@ -433,8 +464,13 @@ public:
                     }
 
                     if (row.size() >= 5) {
-                        auto profObj = std::make_unique<Profesor>(row[0], row[1], row[2], row[3], row[4]);
-                        profesores[row[0]] = std::move(profObj);
+                        auto existente = profesores.find(row[0]);
+                        if (existente != profesores.end()) {
+                            delete existente->second;
+                        }
+
+                        Profesor* profObj = new Profesor(row[0], row[1], row[2], row[3], row[4]);
+                        profesores[row[0]] = profObj;
                     }
                 }
                 std::cout << "📁 Profesores cargados correctamente.\n";
@@ -447,7 +483,7 @@ public:
     void registrarAlumno() {
         try {
             while (true) {
-                std::cout << "\n--- REGISTRO DE ALUMNO (Presione [ESC] para volver) ---\n";
+                std::cout << "\n--- REGISTRO DE ALUMNO (Escriba 'Esc' o presione [ESC] para volver) ---\n";
 
                 std::string cedula;
                 while (true) {
@@ -511,7 +547,7 @@ public:
                     std::cout << "❌ Formato inválido. Asegúrate de incluir '@' y un dominio válido.\n\n";
                 }
 
-                std::unique_ptr<ProgramaAcademico> programa;
+                ProgramaAcademico* programa = nullptr;
                 std::string tipoPrograma;
                 while (true) {
                     std::cout << "\nSeleccione el Tipo de Programa:\n";
@@ -523,27 +559,35 @@ public:
 
                     if (opcionPrograma == "1") {
                         tipoPrograma = "Curso";
-                        programa = std::make_unique<Curso>();
+                        programa = new Curso();
                     } else if (opcionPrograma == "2") {
                         tipoPrograma = "Diplomado";
-                        programa = std::make_unique<Diplomado>();
+                        programa = new Diplomado();
                     } else if (opcionPrograma == "3") {
                         tipoPrograma = "Bootcamp";
-                        programa = std::make_unique<Bootcamp>();
+                        programa = new Bootcamp();
                     } else {
                         std::cout << "❌ Error: Opción inválida. Debe seleccionar 1, 2 o 3.\n";
                         continue;
                     }
 
-                    std::string confirmacion = pedir("Has seleccionado: " + tipoPrograma + ". ¿Es correcto? (s/n): ");
-                    if (esConfirmacionSi(confirmacion)) {
-                        break;
+                    try {
+                        std::string confirmacion = pedir("Has seleccionado: " + tipoPrograma + ". ¿Es correcto? (s/n): ");
+                        if (esConfirmacionSi(confirmacion)) {
+                            break;
+                        }
+                    } catch (const VolverAlMenuException&) {
+                        delete programa;
+                        throw;
                     }
+
+                    delete programa;
+                    programa = nullptr;
                     std::cout << "🔄 De acuerdo, vamos a seleccionar el tipo de programa de nuevo.\n\n";
                 }
 
-                auto nuevoAlumno = std::make_unique<Alumno>(cedula, nombre, correo, std::move(programa));
-                alumnos[cedula] = std::move(nuevoAlumno);
+                Alumno* nuevoAlumno = new Alumno(cedula, nombre, correo, programa);
+                alumnos[cedula] = nuevoAlumno;
                 guardarAlumnosDisco();
                 std::cout << "✅ Alumno '" << nombre << "' registrado exitosamente en memoria y en alumnos.txt\n";
 
@@ -561,7 +605,7 @@ public:
     void registrarProfesor() {
         try {
             while (true) {
-                std::cout << "\n--- REGISTRO DE PROFESOR (Presione [ESC] para volver) ---\n";
+                std::cout << "\n--- REGISTRO DE PROFESOR (Escriba 'Esc' o presione [ESC] para volver) ---\n";
 
                 std::string cedulaProf;
                 while (true) {
@@ -660,8 +704,8 @@ public:
                     std::cout << "❌ Error: La materia no puede estar vacía.\n";
                 }
 
-                auto profesor = std::make_unique<Profesor>(cedulaProf, nombreProf, correoProf, especialidad, materia);
-                profesores[cedulaProf] = std::move(profesor);
+                Profesor* profesor = new Profesor(cedulaProf, nombreProf, correoProf, especialidad, materia);
+                profesores[cedulaProf] = profesor;
 
                 try {
                     std::ofstream f("profesores.txt", std::ios::out | std::ios::app);
@@ -693,7 +737,7 @@ public:
 
         try {
             while (true) {
-                std::cout << "\n--- REGISTRO DE NOTAS (Presione [ESC] para volver) ---\n";
+                std::cout << "\n--- REGISTRO DE NOTAS (Escriba 'Esc' o presione [ESC] para volver) ---\n";
 
                 std::string cedulaBuscar;
                 while (true) {
@@ -716,7 +760,7 @@ public:
                     return;
                 }
 
-                Alumno* alumnoInfo = it->second.get();
+                Alumno* alumnoInfo = it->second;
                 std::string tipoProg = (alumnoInfo->getPrograma() != nullptr) ? alumnoInfo->getPrograma()->getNombre() : "Curso";
                 std::cout << "✅ Alumno encontrado: " << alumnoInfo->getNombre() << " | Programa: " << tipoProg << "\n";
 
@@ -791,7 +835,7 @@ public:
 
         auto it = alumnos.find(ultimaAccion.cedula);
         if (it != alumnos.end() && !it->second->getNotas().empty()) {
-            Alumno* alumno = it->second.get();
+            Alumno* alumno = it->second;
             auto& notas = alumno->getNotasModificables();
             auto pos = std::find(notas.begin(), notas.end(), ultimaAccion.nota);
             if (pos != notas.end()) {
@@ -812,7 +856,7 @@ public:
         std::vector<const Alumno*> alumnosAprobados;
         for (const auto& par : alumnos) {
             if (par.second->getEstado() == "APROBADO") {
-                alumnosAprobados.push_back(par.second.get());
+                alumnosAprobados.push_back(par.second);
             }
         }
 
@@ -892,7 +936,7 @@ public:
             std::cout << "No hay profesores registrados.\n";
         } else {
             for (const auto& par : profesores) {
-                const Profesor* p = par.second.get();
+                const Profesor* p = par.second;
                 std::cout << "ID: " << p->getCedula()
                           << " | Nombre: " << p->getNombre()
                           << " | Materia: " << p->getMateria()
@@ -905,7 +949,7 @@ public:
             std::cout << "No hay alumnos registrados.\n";
         } else {
             for (const auto& par : alumnos) {
-                const Alumno* a = par.second.get();
+                const Alumno* a = par.second;
                 std::string prog = (a->getPrograma() != nullptr) ? a->getPrograma()->getNombre() : "N/A";
                 std::string notasTxt = "Sin notas";
                 if (!a->getNotas().empty()) {
@@ -938,7 +982,7 @@ int main() {
     std::system("color 17");
 #endif
 
-    SistemaGestionAcademica sistema;
+    SistemaGestionAcademica* sistema = new SistemaGestionAcademica();
 
     while (true) {
 #ifdef _WIN32
@@ -958,10 +1002,11 @@ int main() {
         std::cout << "6. Mostrar Reporte General\n";
         std::cout << "7. Salir\n";
         std::cout << "==================================================\n";
-        std::cout << "Seleccione una opción (1-7): ";
 
         std::string entrada;
-        if (!std::getline(std::cin, entrada)) {
+        if (!leerInputConEscape("Seleccione una opción (1-7) [o 'Esc' para salir]: ", entrada)) {
+            std::cout << "\n💾 Guardando cambios pendientes y cerrando la aplicación de forma segura...\n";
+            sistema->guardarAlumnosDisco();
             break;
         }
         entrada = trim(entrada);
@@ -977,38 +1022,38 @@ int main() {
         int opcion = std::stoi(entrada);
 
         if (opcion == 1) {
-            sistema.registrarAlumno();
+            sistema->registrarAlumno();
             std::cout << "\nPresione Enter para volver al menú...";
             std::string pausa;
             std::getline(std::cin, pausa);
         } else if (opcion == 2) {
-            sistema.registrarProfesor();
+            sistema->registrarProfesor();
             std::cout << "\nPresione Enter para volver al menú...";
             std::string pausa;
             std::getline(std::cin, pausa);
         } else if (opcion == 3) {
-            sistema.registrarNotasAlumno();
+            sistema->registrarNotasAlumno();
             std::cout << "\nPresione Enter para volver al menú...";
             std::string pausa;
             std::getline(std::cin, pausa);
         } else if (opcion == 4) {
-            sistema.deshacerUltimaNota();
+            sistema->deshacerUltimaNota();
             std::cout << "\nPresione Enter para volver al menú...";
             std::string pausa;
             std::getline(std::cin, pausa);
         } else if (opcion == 5) {
-            sistema.generarColaCertificados();
+            sistema->generarColaCertificados();
             std::cout << "\nPresione Enter para volver al menú...";
             std::string pausa;
             std::getline(std::cin, pausa);
         } else if (opcion == 6) {
-            sistema.mostrarReporteGeneral();
+            sistema->mostrarReporteGeneral();
             std::cout << "\nPresione Enter para volver al menú...";
             std::string pausa;
             std::getline(std::cin, pausa);
         } else if (opcion == 7) {
             std::cout << "\n💾 Guardando cambios pendientes y cerrando la aplicación de forma segura...\n";
-            sistema.guardarAlumnosDisco();
+            sistema->guardarAlumnosDisco();
             break;
         } else {
             std::cout << "\n❌ Opción inválida. Por favor, seleccione un número entre 1 y 7.\n";
@@ -1017,6 +1062,9 @@ int main() {
             std::getline(std::cin, pausa);
         }
     }
+
+    delete sistema;
+    sistema = nullptr;
 
     return 0;
 }

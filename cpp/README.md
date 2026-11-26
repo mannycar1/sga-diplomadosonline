@@ -5,7 +5,7 @@ Esta versión en C++ aplica Programación Orientada a Objetos, gestión dinámic
 polimorfismo puro, Pila (std::stack), Cola (std::queue) y manipulación de flujos de archivos (std::fstream / std::stringstream) 
 para garantizar la persistencia en disco.
 
-Pendiente de implementar:
+Se implementó de acuerdo a lo solicitado los siguientes parámetros:
 
 - Persistencia mediante fstream (ifstream/ofstream)
 - Gestión manual de memoria: new / delete para cada objeto dinámico (evitar memory leaks)
