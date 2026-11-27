@@ -176,8 +176,8 @@ class Curso : public ProgramaAcademico {
 public:
     Curso() : ProgramaAcademico("Curso") {}
 
-    bool estaAprobado(double promedio, const std::vector<int>&) const override {
-        return promedio >= 10.0;
+    bool estaAprobado(double promedio, const std::vector<int>& notas) const override {
+        return notas.size() == 3 && promedio >= 10.0;
     }
 
     std::string getEstatusCertificado() const override {
@@ -189,8 +189,8 @@ class Diplomado : public ProgramaAcademico {
 public:
     Diplomado() : ProgramaAcademico("Diplomado") {}
 
-    bool estaAprobado(double promedio, const std::vector<int>&) const override {
-        return promedio >= 14.0;
+    bool estaAprobado(double promedio, const std::vector<int>& notas) const override {
+        return notas.size() == 3 && promedio >= 14.0;
     }
 
     std::string getEstatusCertificado() const override {
@@ -203,12 +203,15 @@ public:
     Bootcamp() : ProgramaAcademico("Bootcamp") {}
 
     bool estaAprobado(double, const std::vector<int>& notas) const override {
+        if (notas.size() != 3) {
+            return false;
+        }
         for (int nota : notas) {
             if (nota < 14) {
                 return false;
             }
         }
-        return !notas.empty();
+        return true;
     }
 
     std::string getEstatusCertificado() const override {
@@ -279,7 +282,13 @@ public:
         for (int nota : notas) {
             suma += nota;
         }
-        promedio = static_cast<double>(suma) / static_cast<double>(notas.size());
+        // Promedio calculado sobre las 3 evaluaciones obligatorias del programa
+        promedio = static_cast<double>(suma) / 3.0;
+
+        if (notas.size() < 3) {
+            estado = "PENDIENTE";
+            return;
+        }
 
         bool aprobado = false;
         if (programa != nullptr) {
@@ -765,10 +774,10 @@ public:
                 std::cout << "✅ Alumno encontrado: " << alumnoInfo->getNombre() << " | Programa: " << tipoProg << "\n";
 
                 std::vector<int> calificaciones;
-                std::cout << "\nIngrese las 3 calificaciones ENTERAS (Escala de 0 a 20) para el " << tipoProg << ":\n";
+                std::cout << "\nIngrese las 3 calificaciones OBLIGATORIAS (Escala de 0 a 20) para el " << tipoProg << ":\n";
                 for (int i = 1; i <= 3; ++i) {
                     while (true) {
-                        std::string notaStr = pedir("Calificación " + std::to_string(i) + " (0-20): ");
+                        std::string notaStr = pedir("Calificación " + std::to_string(i) + " de 3 (0-20): ");
                         if (esDigitoStr(notaStr)) {
                             int nota = std::stoi(notaStr);
                             if (nota >= 0 && nota <= 20) {
@@ -791,18 +800,18 @@ public:
 
                 std::ostringstream criterioOss;
                 if (tipoProg == "Diplomado") {
-                    criterioOss << "Promedio requerido: >= 14.0 (Tu promedio: "
+                    criterioOss << "3 notas obligatorias y promedio >= 14.0 (Promedio: "
                                 << std::fixed << std::setprecision(2) << alumnoInfo->getPromedio() << ")";
                 } else if (tipoProg == "Bootcamp") {
-                    criterioOss << "Requisito Bootcamp: Ninguna nota individual puede ser menor a 14";
+                    criterioOss << "3 notas obligatorias y ninguna nota individual menor a 14";
                 } else {
-                    criterioOss << "Promedio requerido: >= 10.0 (Tu promedio: "
+                    criterioOss << "3 notas obligatorias y promedio >= 10.0 (Promedio: "
                                 << std::fixed << std::setprecision(2) << alumnoInfo->getPromedio() << ")";
                 }
 
                 std::cout << "\n" << std::string(45, '=') << "\n";
                 std::cout << "📊 RESULTADOS FINALES PARA: " << alumnoInfo->getNombre() << "\n";
-                std::cout << "Notas registradas: [";
+                std::cout << "Notas registradas (" << calificaciones.size() << "/3): [";
                 for (size_t i = 0; i < calificaciones.size(); ++i) {
                     std::cout << calificaciones[i] << (i + 1 < calificaciones.size() ? ", " : "");
                 }
@@ -847,6 +856,10 @@ public:
             std::cout << "↩️ Se ha deshecho la nota " << ultimaAccion.nota
                       << " del alumno " << alumno->getNombre()
                       << " (Cédula: " << ultimaAccion.cedula << ").\n";
+            if (alumno->getNotas().size() < 3) {
+                std::cout << "ℹ️ El alumno ahora tiene " << alumno->getNotas().size()
+                          << "/3 notas; su estado pasa a " << alumno->getEstado() << ".\n";
+            }
         } else {
             std::cout << "⚠️ El alumno asociado ya no tiene notas registradas.\n";
         }
@@ -963,7 +976,7 @@ public:
                 std::cout << "ID: " << a->getCedula()
                           << " | Nombre: " << a->getNombre()
                           << " | Prog: " << prog
-                          << " | Notas: [" << notasTxt << "]"
+                          << " | Notas (" << a->getNotas().size() << "/3): [" << notasTxt << "]"
                           << " | Prom: " << std::fixed << std::setprecision(1) << a->getPromedio()
                           << " | Estado: " << a->getEstado() << "\n";
             }
